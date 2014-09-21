@@ -30,7 +30,7 @@ alpha = .1    # learning rate for sgd optimization
 # OUTPUT
 #     logarithmic loss of p given y
 def logloss(p, y):
-    p = max(min(p, 1. - 10e-12), 10e-12)
+    p = max(min(p, 1. - 1e-3), 1e-3)
     return -log(p) if y == 1. else -log(1. - p)
 
 
@@ -84,35 +84,39 @@ def update_w(w, n, x, p, y):
     return w, n
 
 
+def training_loop(w, n):
+    loss = 0.
+    for t, row in enumerate(DictReader(open(train))):
+        y = 1. if row['Label'] == '1' else 0.
+
+        del row['Label']  # can't let the model peek the answer
+        del row['Id']  # we don't need the Id
+
+        # main training procedure
+        # step 1, get the hashed features
+        x = get_x(row, D)
+
+        # step 2, get prediction
+        p = get_p(x, w)
+
+        # for progress validation, useless for learning our model
+        loss += logloss(p, y)
+        if t % 1000000 == 0 and t > 1:
+            print('%s\tencountered: %d\tcurrent logloss: %f' % (
+                datetime.now(), t, loss/t))
+
+        # step 3, update model with answer
+        w, n = update_w(w, n, x, p, y)
+    return w, n
+
 # training and testing #######################################################
 
 # initialize our model
 w = [0.] * D  # weights
 n = [0.] * D  # number of times we've encountered a feature
 
-# start training a logistic regression model using on pass sgd
-loss = 0.
-for t, row in enumerate(DictReader(open(train))):
-    y = 1. if row['Label'] == '1' else 0.
-
-    del row['Label']  # can't let the model peek the answer
-    del row['Id']  # we don't need the Id
-
-    # main training procedure
-    # step 1, get the hashed features
-    x = get_x(row, D)
-
-    # step 2, get prediction
-    p = get_p(x, w)
-
-    # for progress validation, useless for learning our model
-    loss += logloss(p, y)
-    if t % 1000000 == 0 and t > 1:
-        print('%s\tencountered: %d\tcurrent logloss: %f' % (
-            datetime.now(), t, loss/t))
-
-    # step 3, update model with answer
-    w, n = update_w(w, n, x, p, y)
+for i in range(2):
+    w, n = training_loop(w, n)
 
 # testing (build kaggle's submission file)
 with open('submission.csv', 'w') as submission:
