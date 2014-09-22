@@ -10,6 +10,7 @@ Forum post: https://www.kaggle.com/c/criteo-display-ad-challenge/forums/t/10322/
 from datetime import datetime
 from csv import DictReader
 from math import exp, log, sqrt
+import numpy as np
 
 
 # parameters #################################################################
@@ -20,6 +21,7 @@ test = 'test.csv'  # path to testing file
 
 D = 2 ** 20   # number of weights use for learning
 alpha = .1    # learning rate for sgd optimization
+n_models = 3  # number of models for bagging/random subset
 
 
 # function definitions #######################################################
@@ -85,13 +87,11 @@ def update_w(w, n, x, p, y):
     return w, n
 
 
-def training_loop(w, n, reverse=False):
-    loss = 0.
-    if not reverse:
-        dr = DictReader(open(train))
-    else:
-        dr = DictReader(open(rev_train))
+def training_loop(w_arr, n_arr, include_prob=.5):
+    loss_arr = [0.] * len(w_arr)
+    dr = DictReader(open(train))
 
+    random_state = np.random.RandomState(1999)
     for t, row in enumerate(dr):
         y = 1. if row['Label'] == '1' else 0.
 
@@ -102,28 +102,35 @@ def training_loop(w, n, reverse=False):
         # step 1, get the hashed features
         x = get_x(row, D)
 
-        # step 2, get prediction
-        p = get_p(x, w)
+        for i in range(len(w_arr)):
+            if random_state.random_sample() < include_prob:
+                # step 2, get prediction
+                p = get_p(x, w_arr[i])
 
-        # for progress validation, useless for learning our model
-        loss += logloss(p, y)
+                # for progress validation, useless for learning our model
+                loss_arr[i] += logloss(p, y)
+
+                # step 3, update model with answer
+                w_arr[i], n_arr[i] = update_w(w_arr[i], n_arr[i], x, p, y)
+
         if t % 1000000 == 0 and t > 1:
-            print('%s\tencountered: %d\tcurrent logloss: %f' % (
-                datetime.now(), t, loss/t))
+        # for progress validation, useless for learning our model
+            for i in range(len(w_arr)):
+                print('Model %d\t %s\tencountered: %d\tcurrent logloss: %f' % (
+                       i, datetime.now(), t, loss_arr[i]/(t * include_prob)))
+    return w_arr, n_arr
 
-        # step 3, update model with answer
-        w, n = update_w(w, n, x, p, y)
-    print("Total number of lines %d" % t)
-    return w, n
+
+def bag_prediction(x, w_arr):
+    return np.mean([get_p(x, w) for w in w_arr])
 
 # training and testing #######################################################
-
 # initialize our model
-w = [0.] * D  # weights
-n = [0.] * D  # number of times we've encountered a feature
+w_arr = [[0.] * D] * n_models  # weights
+n_arr = [[0.] * D] * n_models  # number of times we've encountered a feature
 
 for i in range(2):
-    w, n = training_loop(w, n, reverse=True)
+    w_arr, n_arr = training_loop(w_arr, n_arr)
 
 # testing (build kaggle's submission file)
 with open('submission.csv', 'w') as submission:
@@ -132,5 +139,5 @@ with open('submission.csv', 'w') as submission:
         Id = row['Id']
         del row['Id']
         x = get_x(row, D)
-        p = get_p(x, w)
+        p = bag_prediction(x, w_arr)
         submission.write('%s,%f\n' % (Id, p))
