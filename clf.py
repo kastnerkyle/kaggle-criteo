@@ -15,6 +15,7 @@ from math import exp, log, sqrt
 # parameters #################################################################
 
 train = 'train.csv'  # path to training file
+rev_train = 'rev_train.csv'
 test = 'test.csv'  # path to testing file
 
 D = 2 ** 20   # number of weights use for learning
@@ -30,7 +31,7 @@ alpha = .1    # learning rate for sgd optimization
 # OUTPUT
 #     logarithmic loss of p given y
 def logloss(p, y):
-    p = max(min(p, 1. - 1e-3), 1e-3)
+    p = max(min(p, 1. - 1e-6), 1e-6)
     return -log(p) if y == 1. else -log(1. - p)
 
 
@@ -84,9 +85,14 @@ def update_w(w, n, x, p, y):
     return w, n
 
 
-def training_loop(w, n):
+def training_loop(w, n, reverse=False):
     loss = 0.
-    for t, row in enumerate(DictReader(open(train))):
+    if not reverse:
+        dr = DictReader(open(train))
+    else:
+        dr = DictReader(open(rev_train))
+
+    for t, row in enumerate(dr):
         y = 1. if row['Label'] == '1' else 0.
 
         del row['Label']  # can't let the model peek the answer
@@ -107,6 +113,7 @@ def training_loop(w, n):
 
         # step 3, update model with answer
         w, n = update_w(w, n, x, p, y)
+    print("Total number of lines %d" % t)
     return w, n
 
 # training and testing #######################################################
@@ -116,7 +123,7 @@ w = [0.] * D  # weights
 n = [0.] * D  # number of times we've encountered a feature
 
 for i in range(2):
-    w, n = training_loop(w, n)
+    w, n = training_loop(w, n, reverse=True)
 
 # testing (build kaggle's submission file)
 with open('submission.csv', 'w') as submission:
