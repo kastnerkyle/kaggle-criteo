@@ -21,8 +21,7 @@ test = 'test.csv'  # path to testing file
 
 D = 2 ** 20   # number of weights use for learning
 alpha = .1    # learning rate for sgd optimization
-n_models = 5  # number of models for bagging/random subset
-
+n_models = 11  # number of models for bagging/random subset
 
 # function definitions #######################################################
 
@@ -87,7 +86,7 @@ def update_w(w, n, x, p, y):
     return w, n
 
 
-def training_loop(w_arr, n_arr, include_prob=.5, reverse=False):
+def training_loop(w_arr, n_arr, include_prob=.3, reverse=False):
     loss_arr = [0.] * len(w_arr)
     if reverse:
         dr = DictReader(open(rev_train))
