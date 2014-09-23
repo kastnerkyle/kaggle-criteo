@@ -21,7 +21,7 @@ test = 'test.csv'  # path to testing file
 
 D = 2 ** 20   # number of weights use for learning
 alpha = .1    # learning rate for sgd optimization
-n_models = 3  # number of models for bagging/random subset
+n_models = 5  # number of models for bagging/random subset
 
 
 # function definitions #######################################################
@@ -87,9 +87,12 @@ def update_w(w, n, x, p, y):
     return w, n
 
 
-def training_loop(w_arr, n_arr, include_prob=.5):
+def training_loop(w_arr, n_arr, include_prob=.5, reverse=False):
     loss_arr = [0.] * len(w_arr)
-    dr = DictReader(open(train))
+    if reverse:
+        dr = DictReader(open(rev_train))
+    else:
+        dr = DictReader(open(train))
 
     random_state = np.random.RandomState(1999)
     for t, row in enumerate(dr):
@@ -122,15 +125,16 @@ def training_loop(w_arr, n_arr, include_prob=.5):
 
 
 def bag_prediction(x, w_arr):
-    return np.mean([get_p(x, w) for w in w_arr])
+    return np.min([get_p(x, w) for w in w_arr])
 
 # training and testing #######################################################
 # initialize our model
 w_arr = [[0.] * D] * n_models  # weights
 n_arr = [[0.] * D] * n_models  # number of times we've encountered a feature
 
-for i in range(2):
-    w_arr, n_arr = training_loop(w_arr, n_arr)
+w_arr, n_arr = training_loop(w_arr, n_arr, reverse=True)
+w_arr, n_arr = training_loop(w_arr, n_arr)
+w_arr, n_arr = training_loop(w_arr, n_arr)
 
 # testing (build kaggle's submission file)
 with open('submission.csv', 'w') as submission:
